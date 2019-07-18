@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Serialization;
+using System.Management;
 
 namespace Install_From_MSI
 {
@@ -53,6 +54,8 @@ namespace Install_From_MSI
             //TextWriter file = new StreamWriter(path);
             //writer.Serialize(file,Par1);
             //file.Close();
+
+
             var path = @"C:\Programs\GoogleChrome\config_chrome.xml";
             Params Parm2;
 
@@ -72,17 +75,15 @@ namespace Install_From_MSI
 
 
             string registry_key = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
-            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(registry_key))
-            {
-                Console.WriteLine(key.GetType());
-                foreach (string subkey_name in key.GetSubKeyNames())
-                {
-                    using (RegistryKey subkey = key.OpenSubKey(subkey_name))
-                    {
-                        //  Console.WriteLine(subkey.GetValue("DisplayName"));
-                    }
-                }
-            }
+            string registry_keyx6432 = @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall";
+            ListProg(registry_key);
+            ListProg(registry_keyx6432);
+            
+
+
+
+
+
 
 
             Console.ReadKey();
@@ -204,30 +205,71 @@ namespace Install_From_MSI
         }
 
 
-        //Warning 
-        public static DataRow DataRowInstalledApplication(this RegistryKey rgkey, string keyName)
-        {
-            RegistryKey key = rgkey.OpenSubKey(keyName, false);
-            try
-            {
-                //Application Name is mandetory for a given key.
-                if (key == null || key.RegToString("DisplayName", false) == null) return null;
-                //Build a sanitised data row
-                var rowBuilder = new DataTable().NewRow();
-                rowBuilder["DisplayName"] = key.RegToString("DisplayName");
-                rowBuilder["UninstallString"] = key.RegToString("UninstallString");
-                rowBuilder["InstallLocation"] = key.RegToString("InstallLocation");
-                rowBuilder["Publisher"] = key.RegToString("Publisher");
-                rowBuilder["DisplayIcon"] = key.RegToString("DisplayIcon");
 
-                return rowBuilder;
-            }
-            finally
+
+        public static void ListProg(string path)
+        {
+            int appcount = 0;
+            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(path))
             {
-                if (key != null) key.Close();
+                Console.WriteLine();
+                Console.WriteLine("************************************************************");
+                Console.WriteLine("Key Path: " + path);
+                Console.WriteLine("************************************************************");
+                Console.WriteLine();
+
+
+                foreach (string subkey_name in key.GetSubKeyNames())
+                {
+                    using (RegistryKey subkey = key.OpenSubKey(subkey_name))
+                    {
+
+                        if (subkey.GetValue("DisplayName") != null ) {
+                            if (!subkey.GetValue("DisplayName").ToString().Contains("Microsoft") &&
+                                !subkey.GetValue("DisplayName").ToString().Contains("Windows") ) {
+                                //Console.WriteLine(subkey.GetValue("DisplayName"));
+                                //Console.WriteLine(subkey.GetValue("UninstallString"));
+                                appcount++;
+                            }
+                        }
+                            
+                            
+                            
+                        
+                        
+                    }
+                }
             }
+
+            Console.WriteLine("Count app: " + appcount);
 
         }
+
+
+        ////Warning 
+        //public static DataRow DataRowInstalledApplication(this RegistryKey rgkey, string keyName)
+        //{
+        //    RegistryKey key = rgkey.OpenSubKey(keyName, false);
+        //    try
+        //    {
+        //        //Application Name is mandetory for a given key.
+        //        if (key == null || key.RegToString("DisplayName", false) == null) return null;
+        //        //Build a sanitised data row
+        //        var rowBuilder = new DataTable().NewRow();
+        //        rowBuilder["DisplayName"] = key.RegToString("DisplayName");
+        //        rowBuilder["UninstallString"] = key.RegToString("UninstallString");
+        //        rowBuilder["InstallLocation"] = key.RegToString("InstallLocation");
+        //        rowBuilder["Publisher"] = key.RegToString("Publisher");
+        //        rowBuilder["DisplayIcon"] = key.RegToString("DisplayIcon");
+
+        //        return rowBuilder;
+        //    }
+        //    finally
+        //    {
+        //        if (key != null) key.Close();
+        //    }
+
+        //}
 
 
 
