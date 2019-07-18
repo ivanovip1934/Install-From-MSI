@@ -1,15 +1,20 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using System;
 using System.Collections.Generic;
+using System.Data;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml;
+using System.Xml.Serialization;
 
 namespace Install_From_MSI
 {
     class Program
     {
+        #region using msi.dll
         [DllImport("msi.dll", SetLastError = true)]
         static extern uint MsiOpenDatabase(string szDatabasePath, IntPtr phPersist, out IntPtr phDatabase);
 
@@ -32,20 +37,52 @@ namespace Install_From_MSI
         [DllImport("msi.dll", ExactSpelling = true)]
         static extern uint MsiCloseHandle(IntPtr hAny);
 
+        #endregion
+
 
         static void Main(string[] args)
         {
-
-  
-
+            Console.OutputEncoding = System.Text.Encoding.UTF8;
 
 
+            //Params Par1 = new Params ( @"C:\Programs\GoogleChrome\gchromex64.msi", @"C:\Programs\GoogleChrome\gchromex86.msi", true, false,"");
+            //Console.WriteLine($"PathX86 = {Par1.PathX86}");
+
+            //XmlSerializer writer = new System.Xml.Serialization.XmlSerializer(typeof(Params));
+            //var path = @"C:\Programs\GoogleChrome\config_chrome.xml";
+            //TextWriter file = new StreamWriter(path);
+            //writer.Serialize(file,Par1);
+            //file.Close();
+            var path = @"C:\Programs\GoogleChrome\config_chrome.xml";
+            Params Parm2;
+
+            using (var sr = new StreamReader(path))
+            {
+                 XmlSerializer writer1 = new System.Xml.Serialization.XmlSerializer(typeof(Params));
+                Parm2 = (Params)writer1.Deserialize(sr);
+                 Console.WriteLine($"PathX64 = {Parm2.PathX64}");
+                Console.WriteLine($"Update = {Parm2.Update}");
+
+            }
+            string PathToMSI = GetPathMSI(Parm2.PathX64, Parm2.PathX86);
+            Console.WriteLine("Path to MSI: " + PathToMSI );
+             
+            Console.WriteLine(GetMSIInfo(PathToMSI, "ProductVersion"));
+            Console.WriteLine(GetMSIInfo(PathToMSI, "ProductName"));
 
 
-        var Param = new { pathx64 = @"C:\Programs\vcredist_x64.exe", pathx86 = @"C:\Programs\vcredist_x86.exe", };
-
-            Console.WriteLine("Путь до MSI" + GetPathMSI(@"C:\Programs\vcredist_x64.exe", @"C:\Programs\vcredist_x86.exe"));
-            Console.WriteLine(  )
+            string registry_key = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(registry_key))
+            {
+                Console.WriteLine(key.GetType());
+                foreach (string subkey_name in key.GetSubKeyNames())
+                {
+                    using (RegistryKey subkey = key.OpenSubKey(subkey_name))
+                    {
+                        //  Console.WriteLine(subkey.GetValue("DisplayName"));
+                    }
+                }
+            }
 
 
             Console.ReadKey();
@@ -131,7 +168,7 @@ namespace Install_From_MSI
         //    return retVal;
         //}
 
-        public static string GetVersionInfo(string fileName, string Property)
+        public static string GetMSIInfo(string fileName, string Property)
         {
             string sqlStatement = "SELECT * FROM Property WHERE Property = '" + Property + "'";
             IntPtr phDatabase = IntPtr.Zero;
@@ -158,12 +195,42 @@ namespace Install_From_MSI
             // Get the version from the data 
             int retVal = MsiRecordGetString(hRecord, 2, szValueBuf, ref pcchValueBuf);
 
+            uint uRetCode;
             uRetCode = MsiCloseHandle(phDatabase);
             uRetCode = MsiCloseHandle(phView);
             uRetCode = MsiCloseHandle(hRecord);
 
             return szValueBuf.ToString();
         }
+
+
+        //Warning 
+        public static DataRow DataRowInstalledApplication(this RegistryKey rgkey, string keyName)
+        {
+            RegistryKey key = rgkey.OpenSubKey(keyName, false);
+            try
+            {
+                //Application Name is mandetory for a given key.
+                if (key == null || key.RegToString("DisplayName", false) == null) return null;
+                //Build a sanitised data row
+                var rowBuilder = new DataTable().NewRow();
+                rowBuilder["DisplayName"] = key.RegToString("DisplayName");
+                rowBuilder["UninstallString"] = key.RegToString("UninstallString");
+                rowBuilder["InstallLocation"] = key.RegToString("InstallLocation");
+                rowBuilder["Publisher"] = key.RegToString("Publisher");
+                rowBuilder["DisplayIcon"] = key.RegToString("DisplayIcon");
+
+                return rowBuilder;
+            }
+            finally
+            {
+                if (key != null) key.Close();
+            }
+
+        }
+
+
+
 
 
     }
