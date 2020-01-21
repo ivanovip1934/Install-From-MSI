@@ -14,6 +14,7 @@ namespace Install_From_MSI
     {
         public string PathX64 { get; set; }
         public string PathX86 { get; set; }
+        public bool x86AppOnX64Os { get; set; }
         public string Version { get; set; }
         public bool Update { get; set; }
         public bool ForceRestart { get; set; }

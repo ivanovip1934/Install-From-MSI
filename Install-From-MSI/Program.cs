@@ -25,7 +25,8 @@ namespace Install_From_MSI
 
             string registry_key = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
             string registry_keyx6432 = @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall";
-            string path = @"C:\Programs\GoogleChrome\config_chrome.xml";
+            string path = @"C:\Programs\FineReader\FineReader.xml";
+            // string path = @"C:\Programs\GoogleChrome\config_chrome.xml";
             Options Parm2;
 
 
@@ -49,16 +50,19 @@ namespace Install_From_MSI
             }
             
             NewApp newapp = new NewApp(Parm2);
-            WriteEvents wrevent = new WriteEvents(Parm2.PathToDirLog ,"TestNameApp");
+            WriteEvents wrevent = new WriteEvents(Parm2.PathToDirLog);
 
             newapp.EventLog += wrevent.WriteLog;
-            //newapp.Install += wrevent.Install;
-            //newapp.ErrorInstall += wrevent.InstallError;
-            //newapp.Uninstall += wrevent.Uninstall;
-            //newapp.ErrorUninstall += wrevent.UninstallError;
+            // newapp.Install += wrevent.Install;
+            // newapp.ErrorInstall += wrevent.InstallError;
+            // newapp.Uninstall += wrevent.Uninstall;
+            // newapp.ErrorUninstall += wrevent.UninstallError;
             Console.WriteLine("Path to MSI: " + newapp.PathMsi);
+            Console.WriteLine("x86AppOnX64Os is: " + newapp.x86AppOnX64Os);
+            Console.WriteLine("Name app in MSI: " + newapp.Name);
+            Console.WriteLine("Version MSI app: " + newapp.Version);
             newapp.InstallApp();
-                
+
             Console.ReadKey();          
 
 

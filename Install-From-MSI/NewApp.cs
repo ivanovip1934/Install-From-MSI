@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Install_From_MSI
@@ -13,51 +14,25 @@ namespace Install_From_MSI
     [Serializable]
     class NewApp {
 
-        #region using msi.dll
-        [DllImport("msi.dll", SetLastError = true)]
-        static extern uint MsiOpenDatabase(string szDatabasePath, IntPtr phPersist, out IntPtr phDatabase);
-
-        [DllImport("msi.dll", CharSet = CharSet.Unicode)]
-        static extern int MsiDatabaseOpenViewW(IntPtr hDatabase, [MarshalAs(UnmanagedType.LPWStr)] string szQuery, out IntPtr phView);
-
-        [DllImport("msi.dll", CharSet = CharSet.Unicode)]
-        static extern int MsiViewExecute(IntPtr hView, IntPtr hRecord);
-
-        [DllImport("msi.dll", CharSet = CharSet.Unicode)]
-        static extern uint MsiViewFetch(IntPtr hView, out IntPtr hRecord);
-
-        [DllImport("msi.dll", CharSet = CharSet.Unicode)]
-        static extern int MsiRecordGetString(IntPtr hRecord, int iField,
-           [Out] StringBuilder szValueBuf, ref int pcchValueBuf);
-
-        [DllImport("msi.dll", ExactSpelling = true)]
-        static extern IntPtr MsiCreateRecord(uint cParams);
-
-        [DllImport("msi.dll", ExactSpelling = true)]
-        static extern uint MsiCloseHandle(IntPtr hAny);
-
-        #endregion
+        
 
 
         public string Name { get; private set; }
-        private string PathX64 { get; set; }
-        private string PathX86 { get; set; }
         public string PathMsi { get; private set; }
+        public bool x86AppOnX64Os { get; private set; }
         public string Version { get; private set; }
         public bool Update { get; private set; }
         public bool ForceRestart { get; private set; }
         public string Property { get; set; }
 
         private Random rnd;
-        public string pathToTempFileLog{ get; private set; }
+        public string PathToTempFileLog{ get; private set; }
 
         public event EventHandler<InstallEvent> EventLog;
-
+        
         public NewApp(string pathX64, string pathX86,string version, bool update, bool forceRestart, string property) {
-            PathX64 = pathX64;
-            PathX86 = pathX86;
             Version = version;
-            PathMsi = GetPathMSI(PathX64, PathX86);
+            PathMsi = GetPathMSI(pathX64, pathX86);
             Update = update;
             ForceRestart = forceRestart;
             Property = property;
@@ -65,16 +40,18 @@ namespace Install_From_MSI
 
         public NewApp(Options options) {
 
-
             PathMsi = GetPathMSI(options.PathX64, options.PathX86);
-            Name = GetMSIInfo(PathMsi, "ProductName");
-            Version = (!string.IsNullOrEmpty(options.Version)) ? options.Version: GetMSIInfo(PathMsi, "ProductVersion");;
+            x86AppOnX64Os = options.x86AppOnX64Os;
+            Version = (!string.IsNullOrEmpty(options.Version)) ? options.Version : GetInfoMSI(PathMsi, "ProductVersion");
+            Name = GetInfoMSI(PathMsi, "ProductName");
+            //Version = (!string.IsNullOrEmpty(options.Version)) ? options.Version: GetMSIInfo(PathMsi, "ProductVersion");
             Update = options.Update;
             ForceRestart = options.ForceRestart;
             Property = options.Property;
             rnd = new Random();
-            pathToTempFileLog = Path.Combine(Environment.GetEnvironmentVariable("TEMP", EnvironmentVariableTarget.Machine), $"LogInstallApp{rnd.Next(1000, 2000)}.log");
+            PathToTempFileLog = Path.Combine(Environment.GetEnvironmentVariable("TEMP", EnvironmentVariableTarget.Machine), $"LogInstallApp{rnd.Next(1000, 2000)}.log");
             
+
         }
 
 
@@ -118,47 +95,19 @@ namespace Install_From_MSI
             return "privet";
         }
 
-        string GetMSIInfo(string fileName, string Property) {
+        string GetInfoMSI(string fileName, string property) {
+            string STR = String.Empty;
+            GetMsiInfo msiinfo = new GetMsiInfo();
+            msiinfo.GetMSIInfo(fileName, property);
+            //Thread tread = new Thread(() => msiinfo.GetMSIInfo(fileName, property));
+            //tread.Start();
+            //Thread.Sleep(300);
+            
+            
+            STR = msiinfo.ValueProperty;
+            
+            return STR;
 
-            try {
-                using (Stream stream = new FileStream(fileName, FileMode.Open)) {
-                }
-            }
-            catch (Exception e) {
-                //check here why it failed and ask user to retry if the file is in use.
-                Console.WriteLine(e.Message);
-            }
-            string sqlStatement = "SELECT * FROM Property WHERE Property = '" + Property + "'";
-            IntPtr phDatabase = IntPtr.Zero;
-            IntPtr phView = IntPtr.Zero;
-            IntPtr hRecord = IntPtr.Zero;
-
-            StringBuilder szValueBuf = new StringBuilder();
-            int pcchValueBuf = 255;
-
-            // Open the MSI database in the input file 
-            uint val = MsiOpenDatabase(fileName, IntPtr.Zero, out phDatabase);
-
-            hRecord = MsiCreateRecord(1);
-
-            // Open a view on the Property table for the version property 
-            int viewVal = MsiDatabaseOpenViewW(phDatabase, sqlStatement, out phView);
-
-            // Execute the view query 
-            int exeVal = MsiViewExecute(phView, hRecord);
-
-            // Get the record from the view 
-            uint fetchVal = MsiViewFetch(phView, out hRecord);
-
-            // Get the version from the data 
-            int retVal = MsiRecordGetString(hRecord, 2, szValueBuf, ref pcchValueBuf);
-
-            uint uRetCode;
-            uRetCode = MsiCloseHandle(phDatabase);
-            uRetCode = MsiCloseHandle(phView);
-            uRetCode = MsiCloseHandle(hRecord);
-
-            return szValueBuf.ToString();
         }
 
         public bool IsNeedInstall(CurApp curapp) {
@@ -166,7 +115,7 @@ namespace Install_From_MSI
             string[] arrversionMSI = Version.Trim().Split('.');
             int count = (arrVersionCurApp.Count() >= arrversionMSI.Count()) ? arrversionMSI.Count() : arrVersionCurApp.Count();
 
-            for (int i = 0; i <= count; i++) {
+            for (int i = 0; i < count; i++) {
                 Console.WriteLine($"arrversionMSI[{i}] = {int.Parse(arrversionMSI[i])} arrvDisplayVersion[{i}] = {int.Parse(arrVersionCurApp[i])}");
                 if (int.Parse(arrversionMSI[i]) > int.Parse(arrVersionCurApp[i])) {
                     return true;
@@ -184,13 +133,16 @@ namespace Install_From_MSI
             // 1. Проверяем: есть ли установленная версия данной программы?
             CurApp curapp = ListProg();
 
-            
-            if (curapp != null)
+
+            if (curapp != null) {
+                Console.WriteLine($"Cur app version {curapp.DisplayVersion}");
+                Console.WriteLine($"Cur app UninstallString {curapp.UninstallString}");
                 if (!IsNeedInstall(curapp)) {
                     // Если версия установленного приложения больше или равно версии msi - то просто выходим из приложения.
                     Console.WriteLine("программа не требует обновления  - завершаем работу");
                     Environment.Exit(0);
-                } else {
+                }
+                else {
                     // если Update = false - то удаляем текущую установленную программу.
                     if (!Update) {
                         UninstallApp(curapp);
@@ -198,26 +150,27 @@ namespace Install_From_MSI
                             Environment.Exit(0);
                     }
                 }
+            }
 
-           
 
 
-            string installString = $"msiexec /i {PathMsi} /quiet";
+
+            string installString = $"msiexec /i \"{PathMsi}\" /quiet";
             if (ForceRestart)
                 installString = installString + " /forcerestart";
-            installString = installString + $" /log {pathToTempFileLog}";
+            installString = installString + $" /log {PathToTempFileLog}";
 
             int numinst = Cmd(installString);
             switch (numinst) { 
                 case 0:
-                EventLog?.Invoke(this, new InstallEvent("Event: программа установлена", pathToTempFileLog, ResultJob.Install));
+                EventLog?.Invoke(this, new InstallEvent("Event: программа установлена", PathToTempFileLog, ResultJob.Install));
                     break;
                 case 1641:
-                    EventLog?.Invoke(this, new InstallEvent("Event: программа установлена и требуется перезагрузка", pathToTempFileLog, ResultJob.Install));
+                    EventLog?.Invoke(this, new InstallEvent("Event: программа установлена и требуется перезагрузка", PathToTempFileLog, ResultJob.Install));
                     Environment.Exit(0);
                     break;
                 default:
-                    EventLog?.Invoke(this, new InstallEvent($"Event: ошибка № {numinst} при установки программы", pathToTempFileLog, ResultJob.ErrorInstall));
+                    EventLog?.Invoke(this, new InstallEvent($"Event: ошибка № {numinst} при установки программы", PathToTempFileLog, ResultJob.ErrorInstall));
                     Environment.Exit(0);
                     break;
             }
@@ -231,28 +184,38 @@ namespace Install_From_MSI
 
 
          void UninstallApp(CurApp curapp) {
-            string uninstallString = curapp.UninstallString;
+            string uninstallString = curapp.UninstallString.ToLower();
 
             #region Удаляем Msi пакеты используя msiexec
-            if (!string.IsNullOrEmpty(uninstallString) && uninstallString.ToLower().Contains("msiexec")) {
+            if (!string.IsNullOrEmpty(uninstallString) && uninstallString.Contains("msiexec")) {
                 Console.WriteLine($"Будем удалять {curapp.DisplayName} версии {curapp.DisplayVersion} используя msiexec");
-                if (!uninstallString.ToLower().Contains("quiet"))
+                if (uninstallString.Contains("/i")) {
+                    Console.WriteLine("Vmesto udaleniy zapustinza ustanovka");
+                    uninstallString = uninstallString.ToLower().Replace("/i", "/x");
+                    Console.WriteLine($"New uninstallstring: {uninstallString}");
+
+                    Console.ReadKey();
+
+                }
+
+                if (!uninstallString.Contains("quiet"))
                     uninstallString = uninstallString + " /quiet";
-                if (ForceRestart & !uninstallString.ToLower().Contains("forcerestart"))
+
+                if (ForceRestart & !uninstallString.Contains("forcerestart"))
                     uninstallString = uninstallString + " /forcerestart";
-                uninstallString = uninstallString + $" /log {pathToTempFileLog}";
+                uninstallString = uninstallString + $" /log {PathToTempFileLog}";
                 int numuninst = Cmd(uninstallString);
 
                 switch (numuninst) {
                     case 0:
-                        EventLog?.Invoke(this, new InstallEvent("Event: программа удалена", pathToTempFileLog, ResultJob.Uninstall));
+                        EventLog?.Invoke(this, new InstallEvent("Event: программа удалена", PathToTempFileLog, ResultJob.Uninstall));
                         break;
                     case 1641:
-                        EventLog?.Invoke(this, new InstallEvent("Event: программа установлена и требуется перезагрузка", pathToTempFileLog, ResultJob.Uninstall));
+                        EventLog?.Invoke(this, new InstallEvent("Event: программа установлена и требуется перезагрузка", PathToTempFileLog, ResultJob.Uninstall));
                         Environment.Exit(0);
                         break;
                     default:
-                        EventLog?.Invoke(this, new InstallEvent($"Event: ошибка № {numuninst} при удалении программы", pathToTempFileLog, ResultJob.ErrorUninstall));
+                        EventLog?.Invoke(this, new InstallEvent($"Event: ошибка № {numuninst} при удалении программы", PathToTempFileLog, ResultJob.ErrorUninstall));
                         Environment.Exit(0);
                         break;
                 }                
@@ -264,8 +227,11 @@ namespace Install_From_MSI
 
 
         CurApp ListProg() {
-            string registry_key = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
-
+            string registry_key = String.Empty;
+            registry_key = x86AppOnX64Os?
+                @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall":
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+            
             if (string.IsNullOrEmpty(registry_key) || string.IsNullOrEmpty(this.Name)) {
                 Console.WriteLine("reg path or appName is null");
                 Environment.Exit(0);
