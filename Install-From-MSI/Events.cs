@@ -12,9 +12,8 @@ namespace Install_From_MSI
         public string TmpFileLog { get; private set; }
         public ResultJob RJ { get; private set; }
 
-        public InstallEvent(string message, string tmpfilelog, ResultJob rj) {
+        public InstallEvent(string message, ResultJob rj) {
             Message = message;
-            TmpFileLog = tmpfilelog;
             RJ = rj;
         }
     }

@@ -19,7 +19,7 @@ namespace Install_From_MSI
         public bool Update { get; set; }
         public bool ForceRestart { get; set; }
         public string Property { get; set; }
-        public string PathToDirLog { get; set; }
+        //public string PathToDirLog { get; set; }
 
         public Options() { }
 

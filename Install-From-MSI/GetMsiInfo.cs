@@ -42,7 +42,7 @@ namespace Install_From_MSI {
         {
             try
             {
-                using (Stream stream = new FileStream(fileName, FileMode.Open))
+                using (Stream stream = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
                 }
             }

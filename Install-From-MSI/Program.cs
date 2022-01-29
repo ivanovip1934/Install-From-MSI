@@ -1,73 +1,101 @@
-﻿using Microsoft.Win32;
-using System;
-using System.Collections.Generic;
-using System.Data;
+﻿using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml;
 using System.Xml.Serialization;
-using System.Management;
-using System.Diagnostics;
+
 
 namespace Install_From_MSI
 {
     class Program
     {
-       
 
-
+#if DEBUG
         static void Main(string[] args)
         {
-            //  Console.OutputEncoding = System.Text.Encoding.UTF8;
+#else
+            #region  DLL import for Hidden Window
 
-            string registry_key = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
-            string registry_keyx6432 = @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall";
-            string path = @"C:\Programs\FineReader\FineReader.xml";
-            // string path = @"C:\Programs\GoogleChrome\config_chrome.xml";
-            Options Parm2;
+        [DllImport("user32.dll")]
+        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
+        [DllImport("Kernel32")]
+        private static extern IntPtr GetConsoleWindow();
 
-            //Params Par1 = new Params ( @"C:\Programs\GoogleChrome\gchromex64.msi", @"C:\Programs\GoogleChrome\gchromex86.msi", true, false,"");
-            //Console.WriteLine($"PathX86 = {Par1.PathX86}");
+        const int SW_HIDE = 0;
+        const int SW_SHOW = 5;
 
-            //XmlSerializer writer = new System.Xml.Serialization.XmlSerializer(typeof(Params));
-            //var path = @"C:\Programs\GoogleChrome\config_chrome.xml";
-            //TextWriter file = new StreamWriter(path);
-            //writer.Serialize(file,Par1);
-            //file.Close();
+            #endregion
 
-
+            static void Main(string[] args)
+        {
+            #region Anable Hidden windows
             
+            IntPtr hwnd;
+            hwnd = GetConsoleWindow();
+            ShowWindow(hwnd, SW_HIDE);
             
+            #endregion
+#endif
+            Options Parm2 = new Options();
+            string path = String.Empty;
+            GeneralConfig Conf = GeneralConfig.GetInstance();
 
-            using (var sr = new StreamReader(path))
+            #region Check args
+            if (args.Count() != 1)
             {
-                 XmlSerializer writer1 = new System.Xml.Serialization.XmlSerializer(typeof(Options));
-                Parm2 = (Options)writer1.Deserialize(sr);
+#if DEBUG
+                Console.WriteLine("Program is close");
+#endif
+                Environment.Exit(1);
             }
-            
-            NewApp newapp = new NewApp(Parm2);
-            WriteEvents wrevent = new WriteEvents(Parm2.PathToDirLog);
+            #endregion Check args
 
-            newapp.EventLog += wrevent.WriteLog;
-            // newapp.Install += wrevent.Install;
-            // newapp.ErrorInstall += wrevent.InstallError;
-            // newapp.Uninstall += wrevent.Uninstall;
-            // newapp.ErrorUninstall += wrevent.UninstallError;
-            Console.WriteLine("Path to MSI: " + newapp.PathMsi);
-            Console.WriteLine("x86AppOnX64Os is: " + newapp.x86AppOnX64Os);
-            Console.WriteLine("Name app in MSI: " + newapp.Name);
-            Console.WriteLine("Version MSI app: " + newapp.Version);
-            newapp.InstallApp();
+#if DEBUG
+            Console.WriteLine($"Programs is running...{args.Count()}");
+#endif
+            path = Path.Combine(Conf.PathToDirXML, $"{args[0]}.xml");
 
-            Console.ReadKey();          
+            if (!File.Exists(path))
+            {
+#if DEBUG
+                Console.WriteLine($"Config file: {args[0]}.xml not exists");
+#endif
+                Environment.Exit(1);
+            }
 
+            try
+            {
+                using (var sr = new StreamReader(path))
+                {
+                    XmlSerializer writer1 = new System.Xml.Serialization.XmlSerializer(typeof(Options));
+                    Parm2 = (Options)writer1.Deserialize(sr);
+                }
+            }
+            catch (Exception e)
+            {
+#if DEBUG
+                Console.WriteLine($"Not able reade config file {args[0]}.xml");
+                Console.WriteLine($"Error:\n{e.Message}");
+#endif
+                Environment.Exit(1);
+            }
 
+            if (Parm2 != null)
+            {
+                NewApp newapp = new NewApp(Parm2, Conf.PtrnNames);
+                WriteEvents wrevent = new WriteEvents(Conf.PathToDirLog);
+
+                newapp.EventLog += wrevent.WriteLog;
+#if DEBUG
+                Console.WriteLine("Path to MSI: " + newapp.PathMsi);
+                Console.WriteLine("x86AppOnX64Os is: " + newapp.x86AppOnX64Os);
+                Console.WriteLine("Name app in MSI: " + newapp.Name);
+                Console.WriteLine("Version MSI app: " + newapp.Version);
+#endif
+                newapp.InstallApp();
+            }
         }
-               
-
     }
 }

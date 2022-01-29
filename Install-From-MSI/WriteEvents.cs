@@ -1,11 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.IO;
-using System.Diagnostics;
-using System.Xml.XPath;
 
 namespace Install_From_MSI
 {
@@ -13,19 +8,31 @@ namespace Install_From_MSI
     {
 
         private string pathToDirLog;
-
         public WriteEvents(string pathToDirLog) {
             this.pathToDirLog = pathToDirLog;
         }
         
         public void WriteLog(object sender, InstallEvent e) {
 
+            // Set VARIABLES
             string logFileName = $"{Environment.MachineName}.log";
             string appName = ((NewApp)sender).Name.Replace("\"", "").Replace(",", "").Replace(":", "");
+            string tmpFileLog = ((NewApp)sender).PathToTempFileLog;
+            string fileNameLog = String.Empty;
+            string olderrorlog = String.Empty;
+            string pathToDirLogApp = Path.Combine(pathToDirLog, appName);
+
+            Dictionary<ResultJob, string> dicPathName = new Dictionary<ResultJob, string>() {
+                { ResultJob.Install, Path.Combine(pathToDirLogApp,"install")},
+                { ResultJob.ErrorInstall, Path.Combine(pathToDirLogApp, "error-install")},
+                { ResultJob.Uninstall,Path.Combine(pathToDirLogApp, "uninstall")},
+                { ResultJob.ErrorUninstall,Path.Combine(pathToDirLogApp, "error-uninstall")}
+            };
+
+            // END set VARIABLES
 
             #region Create Directories for store Logs
 
-            string  pathToDirLogApp = Path.Combine(pathToDirLog, appName);
             if (!Directory.Exists(pathToDirLogApp))
                 try{
                     Directory.CreateDirectory(pathToDirLogApp);
@@ -33,81 +40,23 @@ namespace Install_From_MSI
                 catch (Exception expException){
                     Console.WriteLine(expException.Message);
                     Environment.Exit(0);
-                }
+                }           
 
-            Dictionary<string, string> dicPathDirAndName = new Dictionary<string, string>() {
-                { "pathToDirLogAppInstall", "install"},
-                { "pathToDirLogAppInstallError", "error-install"},
-                { "pathToDirLogAppUninstall","uninstall"},
-                { "pathToDirLogAppUninstallError","error-uninstall"}
-            };
-            Dictionary<string, string> dicPathName = new Dictionary<string, string>();
+            #endregion
 
-            foreach (KeyValuePair<string, string> entry in dicPathDirAndName)
+            if (e.RJ == ResultJob.Install | e.RJ == ResultJob.Uninstall)
             {
-                dicPathName.Add(entry.Key, Path.Combine(pathToDirLogApp, entry.Value));
-                if (!Directory.Exists(dicPathName[entry.Key]))
-                {
-                    try
-                    {
-                        Directory.CreateDirectory(dicPathName[entry.Key]);
-                    }
-                    catch (Exception ecxException)
-                    {
-                        Console.WriteLine(ecxException.Message);
-                        Environment.Exit(0);
-                    }
-                }
+                fileNameLog = Path.Combine(dicPathName[e.RJ], logFileName);
+                olderrorlog = Path.Combine(dicPathName[e.RJ + 2], logFileName);
+                if (File.Exists(olderrorlog))
+                    File.Delete(olderrorlog);
             }
+            else
+                fileNameLog = Path.Combine(dicPathName[e.RJ], logFileName);
 
-            #endregion  
-            
-            string fileNameLog = String.Empty;
-            string errorlog = String.Empty;
-
-            switch (e.RJ) {
-
-                case ResultJob.Install:
-                    fileNameLog = Path.Combine(dicPathName["pathToDirLogAppInstall"], logFileName);
-                    errorlog = Path.Combine(dicPathName["pathToDirLogAppInstallError"], logFileName);
-                    if (File.Exists(errorlog))
-                        File.Delete(errorlog);
-                    break;
-                case ResultJob.Uninstall:
-                    fileNameLog = Path.Combine(dicPathName["pathToDirLogAppUninstall"], logFileName);
-                    errorlog = Path.Combine(dicPathName["pathToDirLogAppUninstallError"], logFileName);
-                    if (File.Exists(errorlog))
-                        File.Delete(errorlog);
-                    break;
-                case ResultJob.ErrorInstall:
-                    fileNameLog = Path.Combine(dicPathName["pathToDirLogAppInstallError"], logFileName);
-                    break;
-                case ResultJob.ErrorUninstall:
-                    fileNameLog = Path.Combine(dicPathName["PathToDirLogAppUninstallError"], logFileName);
-                    break;
-                default:
-                    break;
-            }   
-            
-            File.Copy(e.TmpFileLog, fileNameLog, true);
-            File.Delete(e.TmpFileLog);
+            File.Copy(tmpFileLog, fileNameLog, true);
+            File.Delete(tmpFileLog);
         }
-
-        int Cmd(string line) {
-
-            Process newpc = Process.Start(
-                new ProcessStartInfo {
-                    FileName = "cmd",
-                    Arguments = $"/c {line}",
-                    WindowStyle = ProcessWindowStyle.Hidden
-                });
-            newpc.WaitForExit();
-            int PcessExitCod = newpc.ExitCode;
-            Console.WriteLine(PcessExitCod.ToString());
-            return PcessExitCod;
-        }
-
-
 
     }
 }
